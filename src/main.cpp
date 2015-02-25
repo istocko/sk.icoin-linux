@@ -35,7 +35,7 @@ CTxMemPool mempool;
 unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
-uint256 hashGenesisBlock("0x12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2");
+uint256 hashGenesisBlock("0x1b4831e92e263d867ebce86d5517767c1a0e918f6edaed3ca2a39d86b709b4c3");
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); // Icoin: starting difficulty is 1 / 2^12
 CBlockIndex* pindexGenesisBlock = NULL;
 int nBestHeight = -1;
@@ -1087,7 +1087,7 @@ uint256 static GetOrphanRoot(const CBlockHeader* pblock)
 
 int64 static GetBlockValue(int nHeight, int64 nFees)
 {
-    int64 nSubsidy = 50 * COIN;
+    int64 nSubsidy = 500 * COIN;
 
     // Subsidy is cut in half every 840000 blocks, which will occur approximately every 4 years
     nSubsidy >>= (nHeight / 840000); // Icoin: 840k blocks in ~4 years
@@ -1095,8 +1095,8 @@ int64 static GetBlockValue(int nHeight, int64 nFees)
     return nSubsidy + nFees;
 }
 
-static const int64 nTargetTimespan = 3.5 * 24 * 60 * 60; // Icoin: 3.5 days
-static const int64 nTargetSpacing = 2.5 * 60; // Icoin: 2.5 minutes
+static const int64 nTargetTimespan = 1 * 24 * 60 * 60; // Icoin: 3.5 days
+static const int64 nTargetSpacing = 1*90; // Icoin: 2.5 minutes
 static const int64 nInterval = nTargetTimespan / nTargetSpacing;
 
 //
@@ -2746,7 +2746,7 @@ bool LoadBlockIndex()
         pchMessageStart[1] = 0xc1;
         pchMessageStart[2] = 0xb7;
         pchMessageStart[3] = 0xdc;
-        hashGenesisBlock = uint256("0xf5ae71e26c74beacc88382716aced69cddf3dffff24f384e1808905e0188f68f");
+        hashGenesisBlock = uint256("0xd54d31591c9d2de454b61e64be53f3d5d1a4dcbae885befb984e27125f5dacb4");
     }
 
     //
@@ -2791,14 +2791,14 @@ bool InitBlockIndex() {
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = 1317972665;
+        block.nTime    = 1424844002;
         block.nBits    = 0x1e0ffff0;
-        block.nNonce   = 2084524493;
+        block.nNonce   = 2085752520;
 
         if (fTestNet)
         {
-            block.nTime    = 1317798646;
-            block.nNonce   = 385270584;
+            block.nTime    = 1424840416;
+            block.nNonce   = 387274933;
         }
 
         //// debug print
@@ -2807,6 +2807,40 @@ bool InitBlockIndex() {
         printf("%s\n", hashGenesisBlock.ToString().c_str());
         printf("%s\n", block.hashMerkleRoot.ToString().c_str());
         assert(block.hashMerkleRoot == uint256("0x97ddfbbae6be97fd6cdf3e7ca13232a3afff2353e29badfab7f73011edd4ced9"));
+	if (false && block.GetHash() != hashGenesisBlock) {
+  	uint256 hashTarget = CBigNum().SetCompact(block.nBits).getuint256();
+	uint256 thash;
+	char scratchpad[SCRYPT_SCRATCHPAD_SIZE];
+	loop {
+	    	printf("Computing...\n");
+		#if defined(USE_SSE2)
+			// Detection would work, but in cases where we KNOW it always has SSE2,
+			// it is faster to use directly than to use a function pointer or conditional.
+		#if defined(_M_X64) || defined(__x86_64__) || defined(_M_AMD64) || (defined(MAC_OSX) && defined(__i386__))
+			// Always SSE2: x86_64 or Intel MacOS X
+			scrypt_1024_1_1_256_sp_sse2(BEGIN(block.nVersion), BEGIN(thash), scratchpad);
+		#else
+			// Detect SSE2: 32bit x86 Linux or Windows
+			scrypt_1024_1_1_256_sp(BEGIN(block.nVersion), BEGIN(thash), scratchpad);
+		#endif
+		#else
+			// Generic scrypt
+			scrypt_1024_1_1_256_sp_generic(BEGIN(block.nVersion), BEGIN(thash), scratchpad);
+		#endif
+			
+		if (thash <= hashTarget)
+			break;
+		block.nNonce += 1;
+		if (block.nNonce == 0) {
+			block.nTime += 1;
+	    	}
+	}
+	
+	printf("END LOOP - block.nTime = %u \n", block.nTime);
+	printf("END LOOP - block.nNonce = %u \n", block.nNonce);
+	printf("END LOOP - block.GetHash = %s\n", block.GetHash().ToString().c_str());
+}
+	
         block.print();
         assert(hash == hashGenesisBlock);
 
